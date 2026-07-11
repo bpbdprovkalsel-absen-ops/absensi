@@ -114,6 +114,7 @@
 
     <button class="btn btn-blue btn-block" id="btnLogin" type="button" style="margin-top:16px;">🔒 Masuk</button>
     <div class="login-msg" id="loginMsg"></div>
+    <a href="index.html" class="btn btn-outline btn-block" style="margin-top:10px;text-decoration:none;">⬅ Kembali ke Mesin Absen</a>
   </div>
 </div>
 
@@ -124,6 +125,7 @@
     <h2>BPBD PROVINSI KALIMANTAN SELATAN</h2>
     <div id="infoAdminLogin" style="margin-top:6px;font-size:12px;color:var(--muted);"></div>
     <button type="button" id="btnLogout" class="btn btn-outline" style="margin-top:10px;padding:6px 14px;font-size:12px;">🚪 Keluar</button>
+    <a href="index.html" class="btn btn-outline" style="margin-top:10px;margin-left:8px;padding:6px 14px;font-size:12px;text-decoration:none;">⬅ Mesin Absen</a>
   </div>
 
   <div class="tabs">
@@ -336,6 +338,18 @@ function escapeHtml(str){
   const div = document.createElement('div');
   div.textContent = (str===undefined || str===null) ? '' : String(str);
   return div.innerHTML;
+}
+
+// Dipakai oleh semua kotak pencarian (Pegawai & Log Absensi): Nama dicocokkan
+// di MANA SAJA (substring, seperti biasa -- ketik "budi" tetap ketemu "Ahmad
+// Budi Santoso"), tapi ID dicocokkan PERSIS SAMA PERSIS. Kalau ID dicocokkan
+// sebagian (di awal atau di mana saja), ketik "1" masih bisa ikut memunculkan
+// ID "11", "10", dst yang bukan orang yang dicari -- padahal ID itu unik per
+// orang, jadi wajar kalau harus ketik persis untuk menemukannya.
+function cocokPencarian(query, id, nama){
+  const q = String(query || '').toLowerCase().trim();
+  if(!q) return true;
+  return String(id).toLowerCase() === q || String(nama).toLowerCase().includes(q);
 }
 
 // ================= LOGIN ADMIN =================
@@ -557,7 +571,7 @@ function badgePembatasanRadius(v){
 }
 function renderPegawai(){
   const q = document.getElementById('searchPegawai').value.toLowerCase();
-  const list = pegawaiCache.filter(p => String(p.Nama).toLowerCase().includes(q) || String(p.ID).toLowerCase().includes(q));
+  const list = pegawaiCache.filter(p => cocokPencarian(q, p.ID, p.Nama));
   const body = document.getElementById('bodyPegawai');
   document.getElementById('countPegawai').textContent = pegawaiCache.length + ' ORANG';
   document.getElementById('emptyPegawai').style.display = list.length? 'none':'block';
@@ -685,7 +699,7 @@ function getFilteredLog(){
     if(bulan && (d.getMonth()+1) != bulan) return false;
     if(tahun && d.getFullYear() != tahun) return false;
     if(ketepatan && l.Ketepatan !== ketepatan) return false;
-    return String(l.Nama).toLowerCase().includes(q) || String(l.ID).toLowerCase().includes(q);
+    return cocokPencarian(q, l.ID, l.Nama);
   });
 }
 // Membentuk link Google Maps dari data lokasi log — mendukung beberapa
@@ -934,7 +948,7 @@ async function exportLogPDF(){
   const logBulanIni = logCache.filter(l=>{
     const d = new Date(l.Timestamp);
     if(isNaN(d) || (d.getMonth()+1) !== bulan || d.getFullYear() !== tahun) return false;
-    return String(l.Nama).toLowerCase().includes(cari) || String(l.ID).toLowerCase().includes(cari);
+    return cocokPencarian(cari, l.ID, l.Nama);
   });
   if(!logBulanIni.length){ showToast('Tidak ada data pada Bulan/Tahun & pencarian ini'); return; }
 
