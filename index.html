@@ -41,6 +41,7 @@
   .status-msg{text-align:center;font-size:13px;margin-top:12px;min-height:18px;}
   .status-ok{color:var(--green);font-weight:700;}
   .status-err{color:var(--red);font-weight:700;}
+  .status-loading{color:var(--muted);font-weight:600;}
 
   .link-admin{
     display:block;text-align:center;margin-top:22px;color:var(--muted);font-size:12px;
@@ -435,6 +436,7 @@ async function cariPegawai(){
   tutupIzinModal();
   resetFotoLokasi();
   if(!id){ statusMsg.textContent = ''; return; }
+  statusMsg.innerHTML = '<span class="status-loading">Mencari...</span>';
   try{
     const res = await fetch(`${API_URL}?action=cariPegawai&id=${encodeURIComponent(id)}`);
     const json = await res.json();
