@@ -883,9 +883,20 @@ function extractDriveFileId(url){
   if(m) return m[1];
   return null;
 }
+// PENTING (perbaikan performa export PDF): foto di dalam PDF cuma ditampilkan
+// sekecil ~14mm (thumbnail kecil di kalender harian) — tapi sebelumnya kode
+// ini selalu meminta foto beresolusi 700px dari Google Drive untuk SETIAP
+// hari, SETIAP pegawai, baik untuk foto Masuk maupun Keluar. Itu artinya
+// export 1 bulan untuk 1 pegawai bisa memuat s/d 60+ foto beresolusi penuh
+// lewat jaringan, padahal yang ditampilkan cuma thumbnail kecil -- inilah
+// yang sebenarnya bikin export lama, BUKAN logo (logo tersimpan lokal di
+// kode, tidak lewat jaringan, jadi nyaris tidak memengaruhi kecepatan).
+// Sekarang ukuran yang diminta diturunkan ke 220px -- masih lebih dari
+// cukup tajam untuk thumbnail sekecil itu, tapi ukuran unduhannya jauh
+// lebih kecil (secara kasar ~90% lebih kecil dari sebelumnya).
 function toViewableImageUrl(url){
   const id = extractDriveFileId(url);
-  if(id) return `https://lh3.googleusercontent.com/d/${id}=s700`;
+  if(id) return `https://lh3.googleusercontent.com/d/${id}=s220`;
   return url;
 }
 function loadImageAsDataUrl(url){
