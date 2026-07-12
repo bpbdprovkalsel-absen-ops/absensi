@@ -6,7 +6,7 @@
 <title>Panel Manajemen Database — BPBD Kalimantan Selatan</title>
 <link rel="icon" href="https://avatars.githubusercontent.com/u/295258675?v=4" />
 <link rel="stylesheet" href="style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
   html,body{overflow-x:hidden;}
   .login-gate{
@@ -318,6 +318,17 @@
 
     <label>Keterangan / Alasan Tambahan</label>
     <input type="text" id="editLogKeterangan" placeholder="Opsional">
+
+    <label>Foto Bukti Saat Ini</label>
+    <div style="margin-bottom:6px;">
+      <img id="editLogFotoPreview" src="" alt="Foto bukti" style="max-width:130px;max-height:130px;border-radius:10px;border:1px solid var(--border);display:none;object-fit:cover;">
+      <div id="editLogFotoKosong" class="loading" style="display:none;padding:0;">Tidak ada foto pada catatan ini.</div>
+    </div>
+    <div class="write-only">
+      <label>Ganti Foto (isi hanya kalau foto di atas kurang jelas)</label>
+      <input type="file" id="editLogFotoBaru" accept="image/*" capture="environment">
+      <div id="editLogFotoBaruInfo" class="loading" style="display:none;padding:4px 0 0;">✅ Foto baru siap disimpan menggantikan foto lama.</div>
+    </div>
 
     <div class="status-msg" id="editLogStatusMsg" style="margin-top:6px;"></div>
 
@@ -764,6 +775,7 @@ document.getElementById('filterKetepatan').addEventListener('change', renderLog)
 // kalau Status = Masuk, dan dikosongkan kalau bukan Masuk.
 let editLogRowAktif = null;
 let editLogPiketAktif = 'Tidak Piket'; // Jenis Piket pegawai yang sedang diedit — dipakai untuk toggle field shift
+let editLogFotoBaruBase64 = ''; // Foto pengganti (sudah dikompres) yang menunggu disimpan, kalau admin memilih file baru
 
 // Field shift Pagi/Malam hanya relevan untuk pegawai "Piket Radio" DAN status
 // MASUK/KELUAR (sama seperti aturan di catatAbsen() / updateLogAbsensi() sisi server).
@@ -806,6 +818,24 @@ async function bukaEditLog(row){
   toggleEditLogShiftField();
   document.getElementById('editLogKeterangan').value = l.Keterangan || '';
   document.getElementById('editLogStatusMsg').innerHTML = '';
+
+  // Foto yang tersimpan ada di kolom berbeda tergantung Status aslinya:
+  // FotoAbsen untuk MASUK/KELUAR, FotoBukti untuk IZIN.
+  const fotoSaatIni = l.Status === 'IZIN' ? l.FotoBukti : l.FotoAbsen;
+  const previewEl = document.getElementById('editLogFotoPreview');
+  const kosongEl = document.getElementById('editLogFotoKosong');
+  if(fotoSaatIni){
+    previewEl.src = toViewableImageUrl(fotoSaatIni);
+    previewEl.style.display = 'inline-block';
+    kosongEl.style.display = 'none';
+  } else {
+    previewEl.style.display = 'none';
+    kosongEl.style.display = 'block';
+  }
+  editLogFotoBaruBase64 = '';
+  document.getElementById('editLogFotoBaru').value = '';
+  document.getElementById('editLogFotoBaruInfo').style.display = 'none';
+
   document.getElementById('modalEditLog').style.display = 'flex';
 }
 
@@ -813,6 +843,7 @@ function tutupEditLog(){
   document.getElementById('modalEditLog').style.display = 'none';
   editLogRowAktif = null;
   editLogPiketAktif = 'Tidak Piket';
+  editLogFotoBaruBase64 = '';
 }
 
 // Format lokal (bukan toISOString) supaya tanggal/jam yang ditampilkan di
@@ -851,7 +882,7 @@ async function simpanEditLog(){
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action:'updateLogAbsensi', username: getUsernameSesi(), row: editLogRowAktif, tanggal, jam, status, keterangan, keteranganPiket })
+      body: JSON.stringify({ action:'updateLogAbsensi', username: getUsernameSesi(), row: editLogRowAktif, tanggal, jam, status, keterangan, keteranganPiket, fotoBaru: editLogFotoBaruBase64 || undefined })
     });
     const json = await res.json();
     if(json.ok){
@@ -869,6 +900,15 @@ async function simpanEditLog(){
 }
 document.getElementById('btnSimpanEditLog').addEventListener('click', simpanEditLog);
 document.getElementById('btnBatalEditLog').addEventListener('click', tutupEditLog);
+document.getElementById('editLogFotoBaru').addEventListener('change', async (e)=>{
+  const file = e.target.files && e.target.files[0];
+  const info = document.getElementById('editLogFotoBaruInfo');
+  if(!file){ editLogFotoBaruBase64 = ''; info.style.display = 'none'; return; }
+  info.style.display = 'block';
+  info.textContent = '⏳ Memproses foto...';
+  editLogFotoBaruBase64 = await resizeImageFile(file, 900, 0.8);
+  info.textContent = '✅ Foto baru siap disimpan menggantikan foto lama.';
+});
 // Klik area gelap di luar kotak modal = sama seperti Batal
 document.getElementById('modalEditLog').addEventListener('click', (e)=>{
   if(e.target.id === 'modalEditLog') tutupEditLog();
@@ -914,6 +954,27 @@ function loadImageAsDataUrl(url){
     };
     img.onerror = ()=> resolve(null);
     img.src = toViewableImageUrl(url);
+  });
+}
+
+// Kompres foto dari file lokal (input type="file") jadi data URL JPEG --
+// dipakai saat admin mengganti foto log absensi yang kurang jelas.
+function resizeImageFile(file, maxWidth, quality){
+  return new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
   });
 }
 
