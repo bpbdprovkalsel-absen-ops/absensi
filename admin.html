@@ -38,6 +38,11 @@
      untuk peran "Admin Lihat-saja". Ini hanya lapisan tampilan; server
      (Code.gs) tetap memvalidasi ulang peran di setiap aksi tulis. */
   body.role-readonly .write-only{ display:none !important; }
+  /* Bagian PEGAWAI dan OPSI IZIN: elemen dengan class "superadmin-write" (form
+     tambah, tombol edit/hapus per baris) cuma boleh dipakai Superadmin. Admin
+     Operasional tetap bisa MELIHAT kedua daftar itu, tapi tidak mengubahnya —
+     hak edit dia dipusatkan di tab Log Absensi saja. */
+  body.superadmin-only-edit .superadmin-write{ display:none !important; }
   .role-badge{
     display:inline-block;margin-left:10px;padding:3px 10px;border-radius:999px;
     background:#eef2f7;color:var(--navy);font-size:11px;font-weight:700;
@@ -138,7 +143,7 @@
 
   <!-- ===================== TAB PEGAWAI ===================== -->
   <section id="tab-pegawai">
-    <div class="write-only" id="formPegawaiWrap">
+    <div class="write-only superadmin-write" id="formPegawaiWrap">
     <label>ID Number / Nomor Registrasi</label>
     <input type="text" id="pId" placeholder="Masukkan ID Pegawai">
     <label>Nama Lengkap Pegawai</label>
@@ -207,7 +212,7 @@
 
   <!-- ===================== TAB OPSI IZIN ===================== -->
   <section id="tab-izin" style="display:none;">
-    <div class="write-only" id="formIzinWrap">
+    <div class="write-only superadmin-write" id="formIzinWrap">
     <label>Teks / Nama Alasan Pilihan Izin</label>
     <input type="text" id="izinTeks" placeholder="Contoh: Cuti Melahirkan / Dinas Luar Kota">
     <input type="hidden" id="izinRow">
@@ -412,6 +417,7 @@ const LABEL_ROLE = {
 
 function terapkanIzinRole(role){
   document.body.classList.toggle('role-readonly', role === ROLE_LIHAT_SAJA);
+  document.body.classList.toggle('superadmin-only-edit', role !== 'Superadmin');
 
   const tabBoleh = AKSES_TAB_PER_ROLE[role] || AKSES_TAB_PER_ROLE[ROLE_LIHAT_SAJA];
   let tabAktifMasihBoleh = false;
@@ -583,7 +589,7 @@ function renderPegawai(){
       <td>${escapeHtml(p.Jabatan)||''}</td>
       <td>${escapeHtml(p.Bidang)||''}</td>
       <td>${badgePiket(p.Piket)}${badgePembatasanRadius(p.PembatasanRadius)}</td>
-      <td class="write-only">
+      <td class="write-only superadmin-write">
         <button class="btn btn-orange" onclick='editPegawai(${p._row})'>✏ Edit</button>
         <button class="btn btn-red" onclick='hapusPegawai(${p._row})'>🗑 Hapus</button>
       </td>
@@ -592,7 +598,7 @@ function renderPegawai(){
 document.getElementById('searchPegawai').addEventListener('input', renderPegawai);
 
 function editPegawai(row){
-  if(getRoleSesi() === ROLE_LIHAT_SAJA){ showToast('Akun Lihat-saja tidak bisa mengubah data'); return; }
+  if(getRoleSesi() !== 'Superadmin'){ showToast('Hanya Superadmin yang bisa mengubah data Pegawai'); return; }
   const p = pegawaiCache.find(x=>x._row===row);
   if(!p) return;
   document.getElementById('pRow').value = row;
@@ -607,7 +613,7 @@ function editPegawai(row){
 }
 
 async function hapusPegawai(row){
-  if(getRoleSesi() === ROLE_LIHAT_SAJA){ showToast('Akun Lihat-saja tidak bisa menghapus data'); return; }
+  if(getRoleSesi() !== 'Superadmin'){ showToast('Hanya Superadmin yang bisa menghapus data Pegawai'); return; }
   if(!confirm('Hapus pegawai ini?')) return;
   try{
     const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -619,6 +625,7 @@ async function hapusPegawai(row){
 }
 
 document.getElementById('btnSavePegawai').onclick = async ()=>{
+  if(getRoleSesi() !== 'Superadmin'){ showToast('Hanya Superadmin yang bisa mengubah data Pegawai'); return; }
   const id = document.getElementById('pId').value.trim();
   const nama = document.getElementById('pNama').value.trim();
   if(!id || !nama){ showToast('ID dan Nama wajib diisi'); return; }
@@ -1215,14 +1222,14 @@ function renderIzin(){
     <tr>
       <td>Baris ${i+1}</td>
       <td class="name-strong">${escapeHtml(o.Teks)}</td>
-      <td class="write-only">
+      <td class="write-only superadmin-write">
         <button class="btn btn-orange" onclick='editIzin(${o._row})'>✏ Edit</button>
         <button class="btn btn-red" onclick='hapusIzin(${o._row})'>🗑 Hapus</button>
       </td>
     </tr>`).join('');
 }
 function editIzin(row){
-  if(getRoleSesi() === ROLE_LIHAT_SAJA){ showToast('Akun Lihat-saja tidak bisa mengubah data'); return; }
+  if(getRoleSesi() !== 'Superadmin'){ showToast('Hanya Superadmin yang bisa mengubah Opsi Izin'); return; }
   const o = izinCache.find(x=>x._row===row);
   if(!o) return;
   document.getElementById('izinRow').value = row;
@@ -1230,7 +1237,7 @@ function editIzin(row){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 async function hapusIzin(row){
-  if(getRoleSesi() === ROLE_LIHAT_SAJA){ showToast('Akun Lihat-saja tidak bisa menghapus data'); return; }
+  if(getRoleSesi() !== 'Superadmin'){ showToast('Hanya Superadmin yang bisa menghapus Opsi Izin'); return; }
   if(!confirm('Hapus opsi izin ini?')) return;
   try{
     const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -1241,6 +1248,7 @@ async function hapusIzin(row){
   }catch(e){ showToast('Gagal menghubungi server'); }
 }
 document.getElementById('btnSaveIzin').onclick = async ()=>{
+  if(getRoleSesi() !== 'Superadmin'){ showToast('Hanya Superadmin yang bisa mengubah Opsi Izin'); return; }
   const teks = document.getElementById('izinTeks').value.trim();
   if(!teks){ showToast('Teks izin wajib diisi'); return; }
   const row = document.getElementById('izinRow').value;
