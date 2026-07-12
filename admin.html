@@ -599,7 +599,7 @@ function renderPegawai(){
       <td class="name-strong">${escapeHtml(p.Nama)}<br><span style="font-weight:400;color:var(--muted);font-size:12px;">${escapeHtml(p.Jabatan)||''}</span></td>
       <td>${escapeHtml(p.Jabatan)||''}</td>
       <td>${escapeHtml(p.Bidang)||''}</td>
-      <td>${badgePiket(p.Piket)}${badgePembatasanRadius(p.PembatasanRadius)}</td>
+      <td>${badgePiket(p.Piket)}${getRoleSesi()==='Superadmin' ? badgePembatasanRadius(p.PembatasanRadius) : ''}</td>
       <td class="write-only superadmin-write">
         <button class="btn btn-orange" onclick='editPegawai(${p._row})'>✏ Edit</button>
         <button class="btn btn-red" onclick='hapusPegawai(${p._row})'>🗑 Hapus</button>
